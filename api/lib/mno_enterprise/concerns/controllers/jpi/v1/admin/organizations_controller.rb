@@ -7,7 +7,7 @@ module MnoEnterprise::Concerns::Controllers::Jpi::V1::Admin::OrganizationsContro
   # 'included do' causes the included code to be evaluated in the
   # context where it is included rather than being executed in the module's context
   included do
-    DEPENDENCIES = [:app_instances, :'app_instances.app', :users, :'users.user_access_requests',
+    DEPENDENCIES = [:app_instances, :'app_instances.app', :'subscriptions', :'subscriptions.product_instance.product', :users, :'users.user_access_requests',
                     :orga_relations, :invoices, :credit_card, :orga_invites, :'orga_invites.user']
     INCLUDED_FIELDS_INDEX = [:uid, :name, :account_frozen,
                              :soa_enabled, :mails, :logo, :latitude, :longitude,
@@ -17,7 +17,7 @@ module MnoEnterprise::Concerns::Controllers::Jpi::V1::Admin::OrganizationsContro
                              :financial_metrics, :created_at, :external_id, :belong_to_sub_tenant,
                              :belong_to_account_manager, :demo_account]
     INCLUDED_FIELDS_SHOW = [:name, :uid, :soa_enabled, :created_at, :account_frozen, :financial_metrics,
-                            :billing_currency, :external_id, :app_instances, :orga_invites, :users,
+                            :billing_currency, :external_id, :app_instances, :subscriptions, :orga_invites, :users,
                             :orga_relations, :invoices, :credit_card, :demo_account]
   end
 
@@ -69,6 +69,7 @@ module MnoEnterprise::Concerns::Controllers::Jpi::V1::Admin::OrganizationsContro
                       .where('owner.id': params[:id], 'status.in': statuses, 'fulfilled_only': true)
                       .select(&:active?)
 
+    @organization_active_subscriptions = MnoEnterprise::Subscription.includes(:'product_instance.product').where(organization_id: params[:id], status: 'fulfilled')
   end
 
   # TODO: sub-tenant scoping
@@ -96,6 +97,7 @@ module MnoEnterprise::Concerns::Controllers::Jpi::V1::Admin::OrganizationsContro
     update_app_list
     @organization = @organization.load_required(*DEPENDENCIES)
     @organization_active_apps = @organization.app_instances
+    @organization_active_subscriptions = @organization.subscriptions
 
     render 'show'
   end
@@ -115,6 +117,7 @@ module MnoEnterprise::Concerns::Controllers::Jpi::V1::Admin::OrganizationsContro
 
     @organization = @organization.load_required(*DEPENDENCIES)
     @organization_active_apps = @organization.app_instances.select(&:active?)
+    @organization_active_subscriptions = @organization.subscriptions
 
     render 'show'
   end

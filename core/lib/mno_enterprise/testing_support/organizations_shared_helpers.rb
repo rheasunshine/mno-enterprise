@@ -140,10 +140,12 @@ module MnoEnterprise::TestingSupport::OrganizationsSharedHelpers
     hash['organization']['credit_card'] = {'presence' => false}
     hash['organization'].merge!(admin_partial_hash_for_invoices(organization))
     hash['organization'].merge!(admin_partial_hash_for_active_apps(organization))
+    hash['organization'].merge!(admin_partial_hash_for_active_subscriptions(organization))
     hash
   end
 
   def admin_partial_hash_for_invoices(organization)
+
     hash = {'invoices' => []}
     organization.invoices.order("ended_at DESC").each do |invoice|
       hash['invoices'].push({
@@ -166,6 +168,21 @@ module MnoEnterprise::TestingSupport::OrganizationsSharedHelpers
                                    'uid' => active_apps.uid,
                                    'app_name' => active_apps.app.name,
                                    'app_logo' => active_apps.app.logo
+                               })
+    end
+    hash
+  end
+
+  def admin_partial_hash_for_active_subscriptions(organization)
+    hash = {'active_subscriptions' => []}
+    organization.subscriptions.select { |subscription| subscription.status == "fulfilled" }.each do |active_subscriptions|
+      hash['active_subscriptions'].push({
+                                   'id' => active_subscriptions.id,
+                                   'status' => active_subscriptions.status,
+                                   'product_uid' => active_subscriptions.product.uid,
+                                   'product_nid' => active_subscriptions.product.nid,
+                                   'product_name' => active_subscriptions.product.name,
+                                   'product_logo' => active_subscriptions.product.logo
                                })
     end
     hash
