@@ -1,7 +1,9 @@
-require 'csv'
+ require 'csv'
 module MnoEnterprise::Concerns::Controllers::Jpi::V1::OrganizationsController
   extend ActiveSupport::Concern
-  DEPENDENCIES = [:users, :orga_invites, :orga_relations, :credit_card, :invoices]
+
+  ATTRIBUTES = [:name, :soa_enabled, :industry, :size, :billing_currency]
+  DEPENDENCIES = [:users, :orga_invites, :orga_relations, :credit_card, :invoices, :main_address]
   #==================================================================
   # Included methods
   #==================================================================
@@ -28,13 +30,11 @@ module MnoEnterprise::Concerns::Controllers::Jpi::V1::OrganizationsController
 
   # PUT /mnoe/jpi/v1/organizations/:id
   def update
-    # Update and Authorize
     authorize! :update, organization
     # Save
-    organization.attributes = organization_update_params
-    changed_attributes = organization.changed_attributes
-    organization.save!
-    MnoEnterprise::EventLogger.info('organization_update', current_user.id, 'Organization update', organization, changed_attributes)
+    organization.update!(organization_update_params)
+    MnoEnterprise::EventLogger.info('organization_update', current_user.id, 'Organization updated', organization)
+    # Bust cache
     current_user.refresh_user_cache
     render 'show_reduced'
   end
@@ -51,9 +51,11 @@ module MnoEnterprise::Concerns::Controllers::Jpi::V1::OrganizationsController
   end
 
   # POST /mnoe/jpi/v1/organizations
+
   def create
     # Create new organization
-    @organization = MnoEnterprise::Organization.create!(organization_update_params)
+    @organization = MnoEnterprise::Organization.new(organization_update_params)
+    @organization.save!
     # Add the current user as Super Admin
     @organization.add_user!(current_user, 'Super Admin')
     # Bust cache
@@ -154,12 +156,14 @@ module MnoEnterprise::Concerns::Controllers::Jpi::V1::OrganizationsController
     @organization ||= MnoEnterprise::Organization.find_one(params[:id], DEPENDENCIES)
   end
 
-  def organization_permitted_update_params
-    [:name, :soa_enabled, :industry, :size, :billing_currency]
+  def organization_params
+    params.require(:organization)
   end
 
   def organization_update_params
-    params.fetch(:organization, {}).permit(*organization_permitted_update_params)
+    organization_params.permit(*ATTRIBUTES).tap do |whitelisted|
+      whitelisted[:main_address_attributes] = organization_params[:main_address_attributes]
+    end
   end
 
   def organization_billing_params
@@ -184,5 +188,4 @@ module MnoEnterprise::Concerns::Controllers::Jpi::V1::OrganizationsController
   def organization_management_enabled?
     return head :forbidden unless Settings.dashboard.organization_management.enabled
   end
-
 end
